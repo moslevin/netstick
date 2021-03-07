@@ -44,81 +44,131 @@ static void jsproxy_client() {
 		printf("error connecting to server: %d (%s)\n", errno, strerror(errno));
 		close(sockFd);
 	}
-	
+
 	sleep(1);
-	
+
 	// -- DO CLIENT THINGS --
+	// 1) Send a fake joystick config
 	js_config_t config = {};
 	config.vid = 0xDEAD;
 	config.pid = 0xBEEF;
-	
+
 	strncpy(config.name, "mostick", sizeof(config.name));
-	
-	config.absAxisCount = 2;
+
+	config.absAxisCount = 4;
 	config.relAxisCount = 0;
-	config.buttonCount = 8;
-	
+	config.buttonCount = 14;
+
 	for (int i = 0; i < config.absAxisCount; i++) {
-		config.absAxis[i] = i;
 		config.absAxisMin[i] = -16384;
 		config.absAxisMax[i] = 16384;
 		config.absAxisFuzz[i] = 0;
 		config.absAxisFlat[i] = 0;
 		config.absAxisResolution[i] = 100;
 	}
-	
-	for (int i = 0; i < config.relAxisCount; i++) {
-		config.relAxis[i] = i;
-	}
-	
-	for (int i = 0; i < config.buttonCount; i++) {
-		config.buttons[i] = i;
-	}
-	
+
+	config.absAxis[0] = ABS_X;
+	config.absAxis[1] = ABS_Y;
+	config.absAxis[2] = ABS_RX;
+	config.absAxis[3] = ABS_RY;
+
+	config.buttons[0] = BTN_NORTH;
+	config.buttons[1] = BTN_EAST;
+	config.buttons[2] = BTN_SOUTH;
+	config.buttons[3] = BTN_WEST;
+	config.buttons[4] = BTN_TL;
+	config.buttons[5] = BTN_TR;
+	config.buttons[6] = BTN_TL2;
+	config.buttons[7] = BTN_TR2;
+
+	config.buttons[8] = BTN_SELECT;
+	config.buttons[9] = BTN_START;
+
+	config.buttons[10] = BTN_DPAD_UP;
+	config.buttons[11] = BTN_DPAD_LEFT;
+	config.buttons[12] = BTN_DPAD_DOWN;
+	config.buttons[13] = BTN_DPAD_RIGHT;
+
 	tlvc_data_t tlvc = {};
 	tlvc_encode_data(&tlvc, 0, sizeof(js_config_t), &config);
-	
+
 	slip_encode_message_t* encode = slip_encode_message_create(sizeof(js_config_t));
 	slip_encode_begin(encode);
-	
+
 	uint8_t* raw = (uint8_t*)&tlvc.header;
-	for (int i = 0; i < sizeof(tlvc.header); i++) {		
+	for (int i = 0; i < sizeof(tlvc.header); i++) {
 		slip_encode_byte(encode, *raw++);
 	}
-	
+
 	raw = (uint8_t*)tlvc.data;
 	for (int i = 0; i < tlvc.dataLen; i++) {
 		slip_encode_byte(encode, *raw++);
 	}
-	
+
 	raw = (uint8_t*)&tlvc.footer;
 	for (int i = 0; i < sizeof(tlvc.footer); i++) {
 		slip_encode_byte(encode, *raw++);
 	}
-	
+
 	slip_encode_finish(encode);
 
 	size_t nWritten = write(sockFd, encode->encoded, encode->index);
-	
+
+	// Send some faked events...
+	js_report_t report;
+	size_t rawReportSize = (sizeof(int32_t) * config.absAxisCount)
+		+ (sizeof(int32_t) * config.relAxisCount)
+		+ (sizeof(uint8_t) * config.buttonCount);
+
+	uint8_t* rawReport = calloc(1, rawReportSize);
+
+	report.absAxis = (int32_t*)rawReport;
+	report.relAxis = (int32_t*)(rawReport + (sizeof(int32_t) * config.absAxisCount));
+	report.buttons = (uint8_t*)(rawReport + (sizeof(int32_t) * config.absAxisCount)
+			+ (sizeof(int32_t) * config.relAxisCount));
+
+	int counter = 0;
+	while (1) {
+		memset(rawReport, 0, rawReportSize);
+
+		int buttonID = counter % 14;
+		int axisID = counter % 4;
+		int positive = counter % 2;
+		report.buttons[buttonID] = 1;
+		if (positive) {
+			report.absAxis[axisID] = 16384;
+		} else {
+			report.absAxis[axisID] = -16384;
+		}
+
+		tlvc_encode_data(&tlvc, 1, rawReportSize, rawReport);
+
+		slip_encode_begin(encode);
+
+	        raw = (uint8_t*)&tlvc.header;
+        	for (int i = 0; i < sizeof(tlvc.header); i++) {
+                	slip_encode_byte(encode, *raw++);
+        	}
+
+        	raw = (uint8_t*)tlvc.data;
+        	for (int i = 0; i < tlvc.dataLen; i++) {
+               		slip_encode_byte(encode, *raw++);
+        	}
+
+        	raw = (uint8_t*)&tlvc.footer;
+        	for (int i = 0; i < sizeof(tlvc.footer); i++) {
+                	slip_encode_byte(encode, *raw++);
+        	}
+		slip_encode_finish(encode);
+
+		nWritten = write(sockFd, encode->encoded, encode->index);
+
+		sleep(1);
+		counter++;
+	}
+
 	slip_encode_message_destroy(encode);
-	
-	#if 0
-	
-	// Write the tlv struct as an iovec in a single operation to the socket.
-	struct iovec iov[3];
-	iov[0].iov_base = &tlvc.header;
-	iov[0].iov_len = sizeof(tlvc.header);
-	iov[1].iov_base = encode->encoded;
-	iov[1].iov_len = encode->encodedSize;
-	iov[2].iov_base = &tlvc.footer;
-	iov[2].iov_len = sizeof(tlvc.footer);
-	
-	size_t nWritten = writev(sockFd, iov, 3);
-	printf("wrote %ld bytes\n", nWritten);
-	// --
-	#endif
-	
-	sleep(10);
+
 	printf("client kill\n");
 	close(sockFd);
 }
@@ -154,6 +204,21 @@ void jsproxy_disconnect(void* clientContext_) {
 		joystick_destroy_context(context->joystickContext);
 	}
 }
+
+static void emit(int fd, int type, int code, int val)
+{
+   struct input_event ie;
+
+   ie.type = type;
+   ie.code = code;
+   ie.value = val;
+   /* timestamp values below are ignored */
+   ie.time.tv_sec = 0;
+   ie.time.tv_usec = 0;
+
+   write(fd, &ie, sizeof(ie));
+}
+
 
 //---------------------------------------------------------------------------
 static void jsproxy_handle_message(jsproxy_client_context_t* context_, uint16_t eventType_, void* data_, size_t dataSize_) {
@@ -200,6 +265,33 @@ static void jsproxy_handle_message(jsproxy_client_context_t* context_, uint16_t 
 		} break;
 		case 1: {
 			printf("received joystick report message\n");
+
+			js_report_t report;
+			js_config_t* config = &context_->joystickContext->config;
+			int fd = context_->joystickContext->fd;
+
+		        size_t rawReportSize = (sizeof(int32_t) * config->absAxisCount)
+                		+ (sizeof(int32_t) * config->relAxisCount)
+		                + (sizeof(uint8_t) * config->buttonCount);
+
+		        uint8_t* rawReport = data_;
+
+		        report.absAxis = (int32_t*)rawReport;
+		        report.relAxis = (int32_t*)(rawReport + (sizeof(int32_t) * config->absAxisCount));
+		        report.buttons = (uint8_t*)(rawReport + (sizeof(int32_t) * config->absAxisCount)
+		                        + (sizeof(int32_t) * config->relAxisCount));
+
+			for (int i = 0; i < config->absAxisCount; i++) {
+				emit(fd, EV_ABS, config->absAxis[i], report.absAxis[i]);
+			}
+			for (int i = 0; i < config->relAxisCount; i++) {
+				emit(fd, EV_REL, config->relAxis[i], report.relAxis[i]);
+			}
+			for (int i = 0; i < config->buttonCount; i++) {
+				emit(fd, EV_KEY, config->buttons[i], report.buttons[i]);
+			}
+			emit(fd, EV_SYN, 0, 0);
+
 		} break;
 		default: {
 			printf("unknown message %d\n", eventType_);
