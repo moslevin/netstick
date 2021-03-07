@@ -48,15 +48,15 @@ server_context_t* server_create(uint16_t port_, int maxClients_, client_handlers
 	}
 	
 	// create a context object and return it
-	server_context_t* context = (server_context_t*)(malloc(sizeof(server_context_t)));
+	server_context_t* context = (server_context_t*)(calloc(1, sizeof(server_context_t)));
 	context->port = port_;
 	context->serverFd = fd;
 	context->maxClients = maxClients_;
 	context->handlers = *clientHandlers_;
-	context->clientContext = (client_context_t**)(malloc(sizeof(client_context_t*) * maxClients_));
+	context->clientContext = (client_context_t**)(calloc(1, sizeof(client_context_t*) * maxClients_));
 	
 	for (int i = 0; i < maxClients_; i++) {
-		context->clientContext[i] = (client_context_t*)(malloc(sizeof(client_context_t)));
+		context->clientContext[i] = (client_context_t*)(calloc(1, sizeof(client_context_t)));
 		context->clientContext[i]->inUse = false;
 		context->clientContext[i]->clientFd = -1;
 		context->clientContext[i]->contextData = NULL;
@@ -167,45 +167,3 @@ void server_run(server_context_t* context_) {
 		}
 	}
 }
-
-#if 0
-
-//---------------------------------------------------------------------------
-void* test_connect(int clientFd_)  {
-	printf("new connection fd=%d!\n", clientFd_);
-}
-
-//---------------------------------------------------------------------------
-void test_disconnect(void* clientContext_) {
-	printf("disconnection!\n");
-}
-
-//---------------------------------------------------------------------------
-bool test_read(int clientFd_, void* clientContext_) {
-	printf("data to read on socket!!\n");
-	char buf[256];
-	int nRead = read(clientFd_, buf, sizeof(buf));
-	if (nRead == 0) {
-		return false;
-	}
-	printf("%d bytes: %s\n", nRead, buf);
-	return true;
-}
-
-//---------------------------------------------------------------------------
-int main() {
-	client_handlers_t handlers = {
-		.onConnect = test_connect,
-		.onDisconnect = test_disconnect,
-		.onReadData = test_read
-	};
-	
-	server_context_t* server = server_create(9001, 10, &handlers);
-	
-	server_run(server);
-	
-	return 0;
-}
-
-#endif
-

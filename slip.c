@@ -8,10 +8,10 @@
 
 //---------------------------------------------------------------------------
 slip_encode_message_t* slip_encode_message_create(size_t rawSize_) {
-	slip_encode_message_t* newMessage = (slip_encode_message_t*)(malloc(sizeof(slip_encode_message_t)));
+	slip_encode_message_t* newMessage = (slip_encode_message_t*)(calloc(1, sizeof(slip_encode_message_t)));
 	
 	newMessage->encodedSize = (rawSize_ * 2) + 2;
-	newMessage->encoded = (uint8_t*)(malloc(newMessage->encodedSize));
+	newMessage->encoded = (uint8_t*)(calloc(1, newMessage->encodedSize));
 	
 	newMessage->index = 0;
 	
@@ -68,10 +68,10 @@ slip_encode_return_t slip_encode_byte(slip_encode_message_t* msg_, uint8_t b_) {
 
 //---------------------------------------------------------------------------
 slip_decode_message_t* slip_decode_message_create(size_t rawSize_) {
-	slip_decode_message_t* newMessage = (slip_decode_message_t*)(malloc(sizeof(slip_decode_message_t)));
+	slip_decode_message_t* newMessage = (slip_decode_message_t*)(calloc(1, sizeof(slip_decode_message_t)));
 	
 	newMessage->rawSize = (rawSize_);
-	newMessage->raw = (uint8_t*)(malloc(newMessage->rawSize));
+	newMessage->raw = (uint8_t*)(calloc(1, newMessage->rawSize));
 	
 	newMessage->inEscape = false;
 	newMessage->index = 0;

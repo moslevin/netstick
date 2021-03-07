@@ -39,7 +39,7 @@ bool tlvc_decode_data(tlvc_data_t* tlvc_, void* data_, size_t dataLen_) {
 	
 	// Verify payload is the same size as specified in the header
 	if (header->length != (dataLen_ - sizeof(tlvc_footer_t) - sizeof(tlvc_header_t))) {
-		printf("message size = %d, expected = %d\n", dataLen_, header->length);
+		printf("message size = %ld, expected = %d\n", dataLen_, header->length);
 		return false;
 	}
 	

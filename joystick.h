@@ -20,7 +20,7 @@ typedef enum {
 
 //---------------------------------------------------------------------------
 typedef struct __attribute__((packed)) {
-	char 		name[16];
+	char 		name[256];
 	uint16_t	vid;
 	uint16_t	pid;
 	
@@ -60,7 +60,7 @@ typedef struct {
 js_context_t* joystick_create(const js_config_t* config_);
 
 //---------------------------------------------------------------------------
-void joystick_destroy_context(js_context_t* context_);
+void joystick_destroy(js_context_t* context_);
 
 //---------------------------------------------------------------------------
 void joystick_begin_update(js_context_t* context_);
@@ -75,7 +75,7 @@ void joystick_update_abs_axis(js_context_t* context_, int axis_, int32_t value_)
 void joystick_update_rel_axis(js_context_t* context_, int axis_, int32_t value_);
 
 //---------------------------------------------------------------------------
-size_t joystick_get_report_size(js_context_t* context_);
+size_t joystick_get_report_size(const js_config_t* context_);
 
 #if defined(__cplusplus)
 }
