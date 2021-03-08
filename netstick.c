@@ -221,6 +221,8 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 	int sockFd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockFd < 0) {
 		printf("error connecting socket: %d (%s)\n", errno, strerror(errno));
+		close(fd);
+		free(indexMap);
 		return;
 	}
 
@@ -235,10 +237,16 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 	if (rc < 0) {
 		printf("error connecting to server: %d (%s)\n", errno, strerror(errno));
 		close(sockFd);
+		close(fd);
+		free(indexMap);
+		return;
 	}
 
 	// Send the joystick configuration message to the server
 	if (!encode_and_transmit(sockFd, 0, &config, sizeof(config))) {
+		close(sockFd);
+		close(fd);
+		free(indexMap);
 		return;
 	}
 
@@ -298,6 +306,11 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 			}
 		}
 	}
+
+	close(sockFd);
+	close(fd);
+	free(rawReport);
+	free(indexMap);
 }
 
 //---------------------------------------------------------------------------
@@ -307,5 +320,9 @@ int main(int argc, void** argv) {
 		return -1;
 	}
 
-	jsproxy_client_uinput(argv[1], argv[2], atoi(argv[3]));
+	while(true) {
+		jsproxy_client_uinput(argv[1], argv[2], atoi(argv[3]));
+		sleep(4);
+	}
+	return 0;
 }
