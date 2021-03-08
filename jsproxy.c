@@ -32,7 +32,6 @@ typedef struct {
 
 //---------------------------------------------------------------------------
 void* jsproxy_connect(int clientFd_)  {
-	printf("%s: enter\n", __func__);
 	jsproxy_client_context_t* newContext = (jsproxy_client_context_t*)(calloc(1, sizeof(jsproxy_client_context_t)));
 	newContext->slipDecode = slip_decode_message_create(32768);	
 	slip_decode_begin(newContext->slipDecode);
@@ -44,7 +43,6 @@ void* jsproxy_connect(int clientFd_)  {
 
 //---------------------------------------------------------------------------
 void jsproxy_disconnect(void* clientContext_) {
-	printf("%s: enter\n", __func__);
 	jsproxy_client_context_t* context = (jsproxy_client_context_t*)clientContext_;
 	slip_decode_message_destroy(context->slipDecode);
 	
@@ -70,10 +68,8 @@ static void emit(int fd, int type, int code, int val)
 
 //---------------------------------------------------------------------------
 static void jsproxy_handle_message(jsproxy_client_context_t* context_, uint16_t eventType_, void* data_, size_t dataSize_) {
-	printf("%s: enter\n", __func__);
 	switch (eventType_) {
 		case 0: {			
-			printf("received joystick config message\n");
 			if (context_->configSet) {
 				printf("configuration already set - ignoring\n");
 				return;
@@ -85,25 +81,6 @@ static void jsproxy_handle_message(jsproxy_client_context_t* context_, uint16_t 
 			}
 			
 			js_config_t* config = (js_config_t*)data_;
-			// process config.			
-			printf("Name: %s\n", config->name);
-			printf("VID: %04X\n", config->vid);
-			printf("PID: %04X\n", config->pid);
-			printf("Number of absolute axes: %d\n", config->absAxisCount);
-			for (int i = 0; i < config->absAxisCount; i++) {
-				printf(" absolute axis %d: id %d\n", i, config->absAxis[i]);
-			}
-			
-			printf("Number of relative axes: %d\n", config->relAxisCount);			
-			for (int i = 0; i < config->relAxisCount; i++) {
-				printf(" relative axis %d: id %d\n", i, config->relAxis[i]);
-				
-			}
-			
-			printf("Number of buttons: %d\n", config->buttonCount);
-			for (int i = 0; i < config->buttonCount; i++) {
-				printf(" button %d: id %d\n", i, config->buttons[i]);
-			}	
 
 			// Okay, so now that we have the configuration, we need to create the 
 			// actual joystick object with its details
@@ -112,8 +89,6 @@ static void jsproxy_handle_message(jsproxy_client_context_t* context_, uint16_t 
 			
 		} break;
 		case 1: {
-			printf("received joystick report message\n");
-
 			if (!context_->configSet || !context_->joystickContext) {
 				printf("joystick hasn't been configured.  Bailing\n");
 				return;
