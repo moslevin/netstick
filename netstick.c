@@ -31,7 +31,7 @@ typedef struct __attribute__((packed)) {
 //---------------------------------------------------------------------------
 typedef struct __attribute__((packed)) {
 	int32_t value;
-	int32_t minimum;	
+	int32_t minimum;
 	int32_t maximum;
 	int32_t flat;
 	int32_t fuzz;
@@ -67,19 +67,33 @@ static bool encode_and_transmit(int sockFd_, uint16_t messageType_, void* data_,
 	for (int i = 0; i < sizeof(tlvc.footer); i++) {
 		slip_encode_byte(encode, *raw++);
 	}
-	
+
 	slip_encode_finish(encode);
 
-	int nWritten = write(sockFd_, encode->encoded, encode->index);
-	
+	int toWrite = encode->index;
+	int nWritten = 0;
+	raw = encode->encoded;
+
+
+	bool died = false;
+	while (toWrite > 0) {
+		nWritten = write(sockFd_, raw, toWrite);
+		if ((nWritten == 0) ||
+			((nWritten == -1) && !((errno == EINTR) || (errno == EAGAIN)))) {
+			died = true;
+			break;
+		}
+		toWrite -= nWritten;
+		raw += nWritten;
+	}
+
 	slip_encode_message_destroy(encode);
-	
-	if ( (nWritten == 0) || 
-	    ((nWritten == -1) && !((errno == EINTR) || (errno == EAGAIN)))) {
+
+	if (died) {
 		printf("socket died during write\n");
 		return false;
 	}
-	
+
 	return true;
 }
 
@@ -100,7 +114,7 @@ static void js_index_map_set(js_index_map_t* indexMap_, int eventType_, int even
 		indexMap_->relAxis[eventId_] = index_;
 	} else if (eventType_ == EV_KEY) {
 		indexMap_->buttons[eventId_] = index_;
-	} 
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -111,7 +125,7 @@ static int js_index_map_get_index(js_index_map_t* indexMap_, int eventType_, int
 		return indexMap_->relAxis[eventId_];
 	} else if (eventType_ == EV_KEY) {
 		return indexMap_->buttons[eventId_];
-	} 
+	}
 	return -1;
 }
 
@@ -146,23 +160,19 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 	// to the server, enabling it to recreate a "virtual" version of it.
 	js_index_map_t* indexMap = (js_index_map_t*)malloc(sizeof(js_index_map_t));
 	js_index_map_init(indexMap);
-	
+
 	js_config_t config = {};
 
 	// Get the basic information for the device at the path specified (USB vid/pid, etc.)
 	input_dev_info_t info = {};
 	ioctl(fd, EVIOCGID, &info);
-	printf("bus=0x%04X, vid=0x%04X, pid=0x%04X, version=0x%04X\n",
-			info.bus, info.vid, info.pid, info.version);
-			
 	config.pid = info.pid;
 	config.vid = info.vid;
 
 	// Get the device's name
 	char devName[256];
 	ioctl(fd, EVIOCGNAME(sizeof(devName)), devName);
-	printf("deviceName=%s\n", devName);
-	
+
 	// Query the device for its supported event types
 	uint8_t bit[EV_MAX][(KEY_MAX + 7) / 8] = {};
 	ioctl(fd, EVIOCGBIT(0, EV_MAX), bit[0]);
@@ -174,12 +184,12 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 			if (i == EV_SYN) {
 				continue;
 			}
-			
+
 			ioctl(fd, EVIOCGBIT(i, KEY_MAX), bit[i]);
-			
+
 			for (int j = 0; j < KEY_MAX; j++) {
 				if (is_bit_set(bit[i], j)) {
-			
+
 					if (i == EV_ABS) {
 						abs_axis_info_t absAxis = {};
 						ioctl(fd, EVIOCGABS(j), &absAxis);
@@ -188,21 +198,20 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 						config.absAxisFuzz[config.absAxisCount] = absAxis.fuzz;
 						config.absAxisFlat[config.absAxisCount] = absAxis.flat;
 						config.absAxisResolution[config.absAxisCount] = 100;
-						
+
 						config.absAxis[config.absAxisCount] = j;
-						
+
 						js_index_map_set(indexMap, i, j, config.absAxisCount);
-						
-						config.absAxisCount++;						
+						config.absAxisCount++;
 					}
 					else if (i == EV_REL) {
 						js_index_map_set(indexMap, i, j, config.relAxisCount);
-						config.relAxis[config.relAxisCount++] = j;						
+						config.relAxis[config.relAxisCount++] = j;
 					}
-					else if (i == EV_KEY) {						
+					else if (i == EV_KEY) {
 						js_index_map_set(indexMap, i, j, config.buttonCount);
 						config.buttons[config.buttonCount++] = j;
-					}				
+					}
 				}
 			}
 		}
@@ -212,6 +221,7 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 	int sockFd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockFd < 0) {
 		printf("error connecting socket: %d (%s)\n", errno, strerror(errno));
+		return;
 	}
 
 	// Connect to the server
@@ -228,7 +238,9 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 	}
 
 	// Send the joystick configuration message to the server
-	encode_and_transmit(sockFd, 0, &config, sizeof(config));
+	if (!encode_and_transmit(sockFd, 0, &config, sizeof(config))) {
+		return;
+	}
 
 	// Wait for input on the open file descriptor.  Update local report 
 	// structure when new events come in, and send report to server when
@@ -259,7 +271,9 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 		for (size_t i = 0; i < numEvents; i++) {
 			// Whenever we get a sync event, flush the current report
 			if (events[i].type == EV_SYN) {
-				encode_and_transmit(sockFd, 1, rawReport, rawReportSize);
+				if (!encode_and_transmit(sockFd, 1, rawReport, rawReportSize)) {
+					return;
+				}
 			} else if (events[i].type == EV_KEY) {
 				int index = js_index_map_get_index(indexMap, events[i].type, events[i].code);
                                 if (index < 0) {
@@ -292,6 +306,6 @@ int main(int argc, void** argv) {
 		printf("usage: netstick [path to input device] [server address] [server port]\n");
 		return -1;
 	}
-	
+
 	jsproxy_client_uinput(argv[1], argv[2], atoi(argv[3]));
 }

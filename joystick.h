@@ -23,18 +23,18 @@ typedef struct __attribute__((packed)) {
 	char 		name[256];
 	uint16_t	vid;
 	uint16_t	pid;
-	
+
 	int32_t absAxisCount;
 	int32_t relAxisCount;
 	int32_t	buttonCount;
-	
+
 	uint32_t absAxis[ABS_CNT];
 	int32_t absAxisMin[ABS_CNT];
 	int32_t absAxisMax[ABS_CNT];
 	int32_t absAxisFuzz[ABS_CNT];
 	int32_t absAxisFlat[ABS_CNT];
 	int32_t absAxisResolution[ABS_CNT];
-	
+
 	uint32_t relAxis[REL_CNT];
 	uint32_t buttons[KEY_CNT];
 } js_config_t;
@@ -49,9 +49,9 @@ typedef struct {
 //---------------------------------------------------------------------------
 typedef struct {
 	int fd;
-	
+
 	js_config_t config;
-	
+
 	js_report_t previousReport;
 	js_report_t currentReport;
 } js_context_t;

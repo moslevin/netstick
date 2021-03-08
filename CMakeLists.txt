@@ -1,7 +1,7 @@
 project(netstick)
 
 set(SERVER_SRC 
-	jsproxy.c
+	netstickd.c
 	server.c
 	slip.c
 	joystick.c
@@ -9,7 +9,7 @@ set(SERVER_SRC
 )
 
 set(CLIENT_SRC
-	jsclient.c
+	netstick.c
 	slip.c
 	joystick.c
 	tlvc.c

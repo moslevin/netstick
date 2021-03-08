@@ -21,32 +21,35 @@ server_context_t* server_create(uint16_t port_, int maxClients_, client_handlers
 		printf("error creating socket: %d (%s)\n", errno, strerror(errno));
 		return NULL;
 	}
-	
+
 	int fd = rc;
 	int enable = 1;
 	rc = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &enable, sizeof(enable));
 	if (rc != 0) {
 		printf("error setting socket option: %d (%s)\n", errno, strerror(errno));
+		close(fd);
 		return NULL;
 	}
-	
+
 	struct sockaddr_in addr = {};
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
 	addr.sin_port = htons(port_);
-	
+
 	rc = bind(fd, (const struct sockaddr *)&addr, sizeof(addr));
 	if (rc < 0) {
 		printf("error binding socket: %d (%s)\n", errno, strerror(errno));
+		close(fd);
 		return NULL;
 	}
-	
+
 	rc = listen(fd, 4);
 	if (rc < 0) {
 		printf("error listening on socket: %d (%s)\n", errno, strerror(errno));
+		close(fd);
 		return NULL;
 	}
-	
+
 	// create a context object and return it
 	server_context_t* context = (server_context_t*)(calloc(1, sizeof(server_context_t)));
 	context->port = port_;
@@ -54,7 +57,7 @@ server_context_t* server_create(uint16_t port_, int maxClients_, client_handlers
 	context->maxClients = maxClients_;
 	context->handlers = *clientHandlers_;
 	context->clientContext = (client_context_t**)(calloc(1, sizeof(client_context_t*) * maxClients_));
-	
+
 	for (int i = 0; i < maxClients_; i++) {
 		context->clientContext[i] = (client_context_t*)(calloc(1, sizeof(client_context_t)));
 		context->clientContext[i]->inUse = false;
@@ -93,23 +96,22 @@ static void server_on_client_connect(server_context_t* context_, int ePollFd_, i
 			context_->clientContext[i]->inUse = true;
 			context_->clientContext[i]->clientFd = clientFd_;
 			context_->clientContext[i]->contextData = context_->handlers.onConnect(clientFd_);
-			
+
 			// Make non-blocking.
 			int flags = fcntl(clientFd_, F_GETFL);
 			flags |= O_NONBLOCK;
 			fcntl(clientFd_, F_SETFL, flags);
-			
 			break;
 		}
 	}
-	
+
 	if (noRoom) {
 		close(clientFd_);
-		printf("can't accept socket - too many clients already\n");
+		printf("can't accept socket - too many clients connected\n");
 		return;
 	}
-	
-	server_register_client_fd(ePollFd_, clientFd_);			
+
+	server_register_client_fd(ePollFd_, clientFd_);
 }
 
 //---------------------------------------------------------------------------
@@ -124,9 +126,9 @@ static void server_on_client_disconnect(server_context_t* context_, int ePollFd_
 //---------------------------------------------------------------------------
 void server_run(server_context_t* context_) {
 	int ePollFd = epoll_create1(0);
-	
+
 	server_register_client_fd(ePollFd, context_->serverFd);
-	
+
 	while (1) {
 		struct epoll_event ev;
 		int nfds = epoll_wait(ePollFd, &ev, 1, -1);
@@ -134,7 +136,7 @@ void server_run(server_context_t* context_) {
 			printf("error on epoll_wait() = %d (%s)\n", errno, strerror(errno));
 			return;
 		}
-		
+
 		// Handle incoming connections on the registered socket.
 		if (ev.data.fd == context_->serverFd) {
 			struct sockaddr_in addr;
@@ -144,20 +146,20 @@ void server_run(server_context_t* context_) {
 				printf("error accepting socket %d (%s)\n", errno, strerror(errno));
 				return;
 			}
-			server_on_client_connect(context_, ePollFd, clientFd);			
+			server_on_client_connect(context_, ePollFd, clientFd);
 		} else {
 		// Handle all other events...
 			for (int i = 0; i < context_->maxClients; i++) {
 				if (context_->clientContext[i]->clientFd == ev.data.fd) {
 					bool error = false;
 					if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR)) {
-						error = true;						
+						error = true;
 					} else if (ev.events & EPOLLIN) {
 						if (!context_->handlers.onReadData(ev.data.fd, context_->clientContext[i]->contextData)) {
 							error = true;
 						}
 					}
-					
+
 					if (error) {
 						server_on_client_disconnect(context_, ePollFd, i);
 					}
