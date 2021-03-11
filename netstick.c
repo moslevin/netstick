@@ -197,7 +197,7 @@ static void jsproxy_client_uinput(const char* ioPath_, const char* serverAddr_, 
 						config.absAxisMax[config.absAxisCount] = absAxis.maximum;
 						config.absAxisFuzz[config.absAxisCount] = absAxis.fuzz;
 						config.absAxisFlat[config.absAxisCount] = absAxis.flat;
-						config.absAxisResolution[config.absAxisCount] = 100;
+						config.absAxisResolution[config.absAxisCount] = 0;
 
 						config.absAxis[config.absAxisCount] = j;
 
