@@ -15,7 +15,7 @@ the client and server roles without assuming a particular network technology or 
 ## Why write it?
 
 My reason for writing netstick is to provide a convenient way to use a bunch of wired USB gamepads with a raspberry pi connected to a TV; where
-the layout of the room make it impractical to connect them directly, and where practical considerations prevent the use of USB extension
+the layout of the room make it impractical to connect them directly, and where USB extension cords would be an eyesore and a tripping hazard.
 cords.  
 
 The idea was to have a conveniently-located secondary Raspberry Pi act as a wifi-enabled joystick hub running multiple instances of the netstick 
@@ -81,6 +81,7 @@ netstick (client):
 `
 	$ ./netstick <source> <ip> <port>
 `	
+
 	Where:
 	- source is the path the uinput device to forward over the network (i.e. /dev/input/eventX)
 	- ip address of the server

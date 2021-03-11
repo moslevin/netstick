@@ -1,5 +1,7 @@
 project(netstick)
 
+set(CMAKE_C_FLAGS "-Wall -Werror -Os")
+
 set(SERVER_SRC 
 	netstickd.c
 	server.c
