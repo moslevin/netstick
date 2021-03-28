@@ -74,7 +74,7 @@ server_context_t* server_create(uint16_t port_, int maxClients_, client_handlers
 static void server_register_client_fd(int ePollFd_, int clientFd_)
 {
     struct epoll_event ev = {};
-    ev.events             = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
+    ev.events             = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLRDHUP | EPOLLET;
     ev.data.fd            = clientFd_;
     if (epoll_ctl(ePollFd_, EPOLL_CTL_ADD, clientFd_, &ev) < 0) {
         printf("error registering client fd=%d: %d (%s)\n", clientFd_, errno, strerror(errno));
@@ -159,7 +159,7 @@ void server_run(server_context_t* context_)
             for (int i = 0; i < context_->maxClients; i++) {
                 if (context_->clientContext[i]->clientFd == ev.data.fd) {
                     bool error = false;
-                    if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR)) {
+                    if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) || (ev.events & EPOLLRDHUP)) {
                         error = true;
                     } else if (ev.events & EPOLLIN) {
                         if (!context_->handlers.onReadData(ev.data.fd, context_->clientContext[i]->contextData)) {

@@ -35,6 +35,7 @@ typedef struct {
 //---------------------------------------------------------------------------
 void* jsproxy_connect(int clientFd_)
 {
+    printf("enter:%s, %d\n", __func__, clientFd_);
     (void)clientFd_;
 
     jsproxy_client_context_t* newContext = (jsproxy_client_context_t*)(calloc(1, sizeof(jsproxy_client_context_t)));
@@ -51,6 +52,7 @@ void jsproxy_disconnect(void* clientContext_)
 {
     jsproxy_client_context_t* context = (jsproxy_client_context_t*)clientContext_;
     slip_decode_message_destroy(context->slipDecode);
+    printf("enter:%s, %d\n", __func__, context->joystickContext->fd);
 
     if (context->configSet && context->joystickContext) {
         joystick_destroy(context->joystickContext);
@@ -88,7 +90,7 @@ jsproxy_handle_message(jsproxy_client_context_t* context_, uint16_t eventType_, 
             }
 
             if (dataSize_ != sizeof(js_config_t)) {
-                printf("expected configuration size %ld, got %ld\n", sizeof(js_config_t), dataSize_);
+                printf("expected configuration size %d, got %d\n", (int)sizeof(js_config_t), (int)dataSize_);
                 return;
             }
 
@@ -199,7 +201,7 @@ static void jsproxy_server(uint16_t port_)
 int main(int argc, char** argv)
 {
     if (argc < 2) {
-        printf("usage: jsproxy [server port]\n");
+        printf("usage: netstickd [server port]\n");
         return -1;
     }
 
