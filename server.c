@@ -12,7 +12,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include <linux/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
 
@@ -106,6 +108,38 @@ static void server_on_client_connect(server_context_t* context_, int ePollFd_, i
             int flags = fcntl(clientFd_, F_GETFL);
             flags |= O_NONBLOCK;
             fcntl(clientFd_, F_SETFL, flags);
+
+            // Enable TCP keepalives on the socket
+            int rc;
+            int enable = 1;
+            rc         = setsockopt(clientFd_, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable));
+            if (rc != 0) {
+                printf("Error enabling socket keepalives on client\n");
+            }
+
+            // Set the timing parameters for dead "Idle" socket checks.
+
+            // Check for dead idle connections on 10s of inactivity
+            int idleTime = 10;
+            rc           = setsockopt(clientFd_, SOL_TCP, TCP_KEEPIDLE, &idleTime, sizeof(idleTime));
+            if (rc != 0) {
+                printf("Error setting initial idle-time value\n");
+            }
+
+            // Set a maximum number of idle-socket heartbeat attemtps before assuming an idle socket it dead
+            int keepCount = 5;
+            rc            = setsockopt(clientFd_, SOL_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));
+            if (rc != 0) {
+                printf("Error setting idle retry count\n");
+            }
+
+            // On performing the socket-idle check, send heartbeat attempts on a specified interval
+            int keepInterval = 5;
+            rc               = setsockopt(clientFd_, SOL_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval));
+            if (rc != 0) {
+                printf("Error setting idle retry interval\n");
+            }
+
             break;
         }
     }
